@@ -1,0 +1,179 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!--/******************************************************************************************************** 
+ * CONFIDENTIAL AND PROPRIETARY 
+ *
+ * The source code and other information contained herein is the confidential and the exclusive property of
+ * ZIH Corporation and is subject to the terms and conditions in your end user license agreement.
+ * This source code, and any other information contained herein, shall not be copied, reproduced, published, 
+ * displayed or distributed, in whole or in part, in any medium, by any means, for any purpose except as
+ * expressly permitted under such license agreement.
+ * 
+ * Copyright ZIH Corporation 2019
+ *
+ * ALL RIGHTS RESERVED 
+ *********************************************************************************************************/
+ 
+ /*********************************************************************************************************
+ File:   SAVANNA_printerTest.html
+
+ Descr: A sample webpage showing how to use Savanna APIs.     
+ Author: Robin West
+ Date: 9/11/2018 
+ Updated: 6/4/2019 
+ *******************************************************************************************************/-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A sample webpage showing how to use Savanna APIs.">
+  <meta name="author" content="Robin West">
+  <title>Savanna Printer Sample</title>
+</head>
+<body onload="onloaded();">
+  <a href="https://developer.savanna.zebra.com/index"><img src="https://www.zebra.com/us/en/header/jcr:content/mainpar/header/navigationComponent/logoImage.adapt.full.png/1425666050944.png" style="height:50px"></a>
+  <h1 style="">Savanna Data Services Sample Code</h1>
+  <h3>Printer Example</h3>
+  API Key:<input type="text" id="apikey" style="width:500px;" value=""><br>
+  <button onclick="loadPrinters(); return false;">Get Printers</button><br>
+  <!--a href="/files/SAVANNA_printerSample.html" download>Download Sample Code</a--><br>
+  <table style="padding:10px;"><tr><th>Printer List</th><th>Printer Data</th></tr><tr>
+  <td style="vertical-align: top;text-align: left;padding:10px;"><div id="printerList"></div></td>
+  <td style="vertical-align: top;text-align: left;padding:10px;"><div id="printerData"></div></td>
+  </tr></table>
+  <br>
+  <div id="output"></div>
+  <script>
+    var currentPrinter = "";
+    var apikey = "";	
+	var primaryurl = "https://sandbox-api.zebra.com/v2/printers-basic";
+    
+    function SendPrintJob()
+    {
+      var sbarcodeZPL = document.getElementById("textZPL").value;
+      var output = document.getElementById("output");
+ 
+      var url = primaryurl + "/" + currentPrinter + "/sendRawData";
+      var method = "POST";
+      var async = true;
+      var request = new XMLHttpRequest();
+      
+      request.onload = function () {
+        var status = request.status; // HTTP response status, e.g., 200 for "200 OK"
+        var data = request.responseText; // Returned data, e.g., an HTML document.
+        var myObj = JSON.parse(data);
+        console.log("Status: " + status + "<br>" + myObj.message);
+        output.innerHTML = myObj.message;
+      }
+
+      request.open(method, url, async);
+      request.setRequestHeader("apikey", apikey);
+
+      // Actually sends the request to the server.
+	  request.send(sbarcodeZPL);
+    }
+    
+    
+    function getPrinter(serialNumber)
+    {
+      var output = document.getElementById("printerData");
+      var url = primaryurl + "/" + serialNumber;
+      var method = "GET";
+      var async = true;
+      var request = new XMLHttpRequest();
+      currentPrinter = serialNumber;
+
+      request.onload = function () {
+        var status = request.status; // HTTP response status, e.g., 200 for "200 OK"
+        var data = request.responseText; // Returned data, e.g., an HTML document.
+        if (status == 200) {
+          var myObj = JSON.parse(data);
+          var txt = "<table border='1'>"
+          for (x in myObj) {
+            txt += "<tr>";
+            txt += "<td>"+x+"</td><td>"+myObj[x]+"</td>";
+            txt += "</tr>";
+          }
+          txt += "</table>";
+          if (myObj.readiness == "ONLINE") 
+          {
+            txt += "<br>Enter ZPL to print:<br><textarea id='textZPL' rows='20' cols='60'></textarea><br>";
+            txt += "<button onclick='SendPrintJob(); return false;'>Print</button>";
+            output.innerHTML = txt;
+          }
+          else output.innerHTML = txt;
+        }
+        else output.innerHTML = "ERROR: " + status + ", " + data;
+      }
+
+      request.open(method, url, async);
+      request.setRequestHeader("apikey", apikey);
+
+      // Actually sends the request to the server.
+      request.send();
+    }
+    
+    function loadPrinters()
+    {
+      apikey = document.getElementById("apikey").value;
+      var limit = 150; 
+      var output = document.getElementById("printerList");
+      var url = primaryurl + "?size=" + limit;
+      var method = "GET";
+      var async = true;
+      var request = new XMLHttpRequest();
+
+      request.onload = function () {
+        var status = request.status; // HTTP response status, e.g., 200 for "200 OK"
+        var data = request.responseText; // Returned data, e.g., an HTML document.
+        if (status == 200) {
+          myObj = JSON.parse(data);
+          var txt = "<table border='1'><tr><th>Serial Number</th><th>Printer Model</th><th>Name</th><th>Status</th></tr>"
+          for (x in myObj["devices"]) {
+              var color = "greenyellow";
+              if (myObj["devices"][x].readiness == "ERROR")
+                color = "sandyBrown";
+              else if (myObj["devices"][x].readiness != "ONLINE")
+                color = "salmon";
+              txt += "<tr style='background-color:"+color+"'>";
+              txt += "<td><a href='#' onclick='getPrinter(\"" + myObj["devices"][x].serialNumber + "\"); return false;'>" + myObj["devices"][x].serialNumber + "</a></td>";
+              txt += "<td>"+myObj["devices"][x].printerModel+"</td><td>"+myObj["devices"][x].printerName+"</td>";
+              if (myObj["devices"][x].readiness == "ERROR")
+                txt += "<td>"+myObj["devices"][x].alerts[0].errorDescription+"</td></tr>";
+              else if (myObj["devices"][x].readiness != "ONLINE") 
+                txt += "<td>Offline</td></tr>";
+              else txt += "<td>Ready</td></tr>";
+          }
+          txt += "</table>" 
+          output.innerHTML = txt;
+        }
+        else output.innerHTML = "ERROR: " + status + ", " + data;
+      }
+
+      request.open(method, url, async);
+      request.setRequestHeader("apikey", apikey);
+
+      // Actually sends the request to the server.
+      request.send();
+    }
+	function getQueryVariable(variable)
+{
+       var query = window.location.search.substring(1);
+       var vars = query.split("&");
+       for (var i=0;i<vars.length;i++) {
+               var pair = vars[i].split("=");
+               if(pair[0] == variable){return pair[1];}
+       }
+       return(false);
+    }
+	function onloaded()
+	{
+		apikey = getQueryVariable("apikey");
+		if (apikey.length > 0)
+		{
+			document.getElementById("apikey").value = apikey;
+		}
+	}
+  </script>
+</body>
+</html>
